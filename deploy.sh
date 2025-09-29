@@ -12,7 +12,7 @@ RESET="\033[0m"
 ENV_FILE=".env"
 
 if [ ! -f "$ENV_FILE" ]; then
-    echo -e "${RED}❌ Файл .env не найден по пути $ENV_FILE${RESET}"
+    echo -e "${RED}❌ Файл .env не найден по пути $ENV_FILE ❌${RESET}"
     exit 1
 fi
 
@@ -38,11 +38,11 @@ for var in "${required_vars[@]}"; do
     fi
 done
 
-echo -e "${GREEN}✅ Файл .env найден и все обязательные переменные заданы.${RESET}"
+echo -e "${GREEN}✅ Файл .env найден и все обязательные переменные заданы ✅${RESET}"
 
 # ---------------- Root Check ----------------
 if [ "$(id -u)" -ne 0 ]; then
-    echo -e "${RED}Скрипт должен быть запущен от root пользователя!${RESET}"
+    echo -e "${RED}❌Скрипт должен быть запущен от root пользователя!${RESET}"
     exit 1
 fi
 
@@ -65,7 +65,7 @@ check_dependencies() {
     done
 
     if [ ${#MISSING[@]} -ne 0 ]; then
-        echo -e "${YELLOW}⚠️ Отсутствуют зависимости: ${MISSING[*]}${RESET}"
+        echo -e "${YELLOW}⚠️ Отсутствуют зависимости: ${MISSING[*]} ⚠️${RESET}"
         read -p "Установить отсутствующие пакеты? (y/n): " choice
         if [[ "$choice" == "y" ]]; then
             detect_and_update_package_manager
@@ -73,11 +73,11 @@ check_dependencies() {
                 install_package $pkg
             done
         else
-            echo -e "${RED}Не все зависимости установлены. Скрипт завершает работу.${RESET}"
+            echo -e "${RED}⚠️ Не все зависимости установлены. Скрипт завершает работу. ⚠️${RESET}"
             exit 1
         fi
     else
-        echo -e "${GREEN}✅ Все зависимости установлены${RESET}"
+        echo -e "${GREEN}✅ Все зависимости установлены ✅${RESET}"
     fi
 }
 
@@ -130,9 +130,9 @@ install_package() {
 basic_authentication() {
     if ! getent passwd "$NEW_USER" >/dev/null 2>&1; then
         useradd -m "$NEW_USER"
-        echo -e "${GREEN}Пользователь ${NEW_USER} создан.${RESET}"
+        echo -e "${GREEN}Пользователь ${NEW_USER} создан 👤${RESET}"
     else
-        echo -e "${YELLOW}Пользователь ${NEW_USER} уже существует.${RESET}"
+        echo -e "${YELLOW}Пользователь ${NEW_USER} уже существует ⚠️${RESET}"
     fi
 
     id -nG "$NEW_USER" | grep -qw "sudo" || usermod -aG sudo "$NEW_USER"
@@ -174,7 +174,7 @@ install_docker() {
     fi
     id -nG "$NEW_USER" | grep -qw "docker" || usermod -aG docker "$NEW_USER"
     systemctl enable --now docker
-    echo -e "${GREEN}✅ Docker готов${RESET}"
+    echo -e "${GREEN}✅ Docker готов 🐳${RESET}"
 }
 
 # ---------------- Firewall ----------------
@@ -187,9 +187,9 @@ configure_firewall() {
         ufw allow "$APP_PORT"
         ufw allow 443
         ufw --force enable
-        echo -e "${GREEN}✅ Firewall настроен${RESET}"
+        echo -e "${GREEN}✅ Firewall настроен 🔥${RESET}"
     else
-        echo -e "${RED}Поддерживается только Ubuntu & Debian${RESET}"
+        echo -e "${RED}⚠️ Поддерживается только Ubuntu & Debian${RESET}"
     fi
 }
 
@@ -212,50 +212,67 @@ install_node_panel() {
             curl -fsSL -o .env https://raw.githubusercontent.com/remnawave/backend/refs/heads/main/.env.sample
             ;;
         *)
-            echo -e "${RED}❌ Некорректный выбор${RESET}"
+            echo -e "${RED}⚠️ Некорректный выбор${RESET}"
             return
             ;;
     esac
 
     read -p "Введите порт для APP_PORT: " APP_PORT
     sed -i "s/^APP_PORT=.*/APP_PORT=${APP_PORT}/" .env
-    echo -e "${GREEN}✅ Установка завершена. Проверьте .env и docker-compose.yml${RESET}"
+    echo -e "${GREEN}✅ Установка завершена. Проверьте .env и docker-compose.yml 🛠️${RESET}"
 }
 
 # ---------------- Info ----------------
 show_info() {
     SERVER_IP=$(curl -s https://ipinfo.io/ip)
     GEO=$(curl -s https://ipinfo.io/$SERVER_IP | grep -E '"city"| "region"| "country"' | tr -d '{},"' | tr '\n' ' ')
-    echo -e "${CYAN}Информация о системе:${RESET}"
+    echo -e "${CYAN}🌐 Информация о системе:${RESET}"
     echo -e "OS: $OS $OS_VER ($ARCH)"
     echo -e "IP: $SERVER_IP"
     echo -e "GEO: $GEO"
-    echo -e "Docker: $(docker --version 2>/dev/null || echo '❌ Не установлен')"
-    echo -e "Пользователь: $NEW_USER ($(id -nG $NEW_USER 2>/dev/null || echo '❌ не существует'))"
+    echo -e "Docker: $(docker --version 2>/dev/null || echo '⚠️ Не установлен')"
+    echo -e "Пользователь: $NEW_USER ($(id -nG $NEW_USER 2>/dev/null || echo '⚠️ не существует'))"
 }
 
 # ---------------- Check scripts ----------------
 check_scripts() {
-    wget -qO- speedtest.artydev.ru | bash
-    wget -qO- bench.sh | bash
-    sysbench cpu run
-    bash <(curl -Ls ip.check.place) -l en
-    bash <(curl -s storage.umager.ru/checker_inst_ru.sh)
-    bash <(curl -s storage.umager.ru/checker_all_ru.sh)
-    bash <(curl -s storage.umager.ru/ipregion.sh)
-    bash <(curl -s storage.umager.ru/yt.sh)
-}
+    echo -e "⚡ Запуск тестов производительности и проверки сети ⚡"
 
+    echo -e "🌐 Speedtest до RU серверов..."
+    wget -qO- speedtest.artydev.ru | bash
+
+    echo -e "🌐 Speedtest до зарубежный серверов..."
+    wget -qO- bench.sh | bash
+
+    echo -e "💻 Bench CPU..."
+    sysbench cpu run
+
+    echo -e "📍 Проверяет IP по разным геобазам, выявляет наличие в спам-реестрах, а также оценивает доступность ключевых интернет-сервисов...."
+    bash <(curl -Ls ip.check.place) -l en
+    bash <(curl -s storage.umager.ru/ipregion.sh)
+
+    echo -e "🔍 Проверка доступности до Запрещеннограмма..."
+    bash <(curl -s storage.umager.ru/checker_inst_ru.sh)
+
+    echo -e "🔍 Проверка доступности до Запрещеннограмма..."
+    bash <(curl -s storage.umager.ru/checker_all_ru.sh)
+
+    echo -e "📺 Проверка YouTube..."
+    bash <(curl -s storage.umager.ru/yt.sh)
+
+    echo -e "✅ Все проверки завершены!"
+}
 
 # ---------------- Menu ----------------
 show_menu() {
     while true; do
         echo -e "\n${BLUE}=== Меню установки Remnawave ===${RESET}"
-        echo "1) Настроить пользователя и SSH"
-        echo "2) Установить Docker"
-        echo "3) Настроить Firewall"
-        echo "4) Установить Ноду/Панель"
-        echo "5) Показать информацию о сервере"
+        echo "1) 🛠️ Настроить пользователя и SSH"
+        echo "2) ⬆️ Установить Docker"
+        echo "3) ⬆️ Настроить Firewall"
+        echo "4) ⬆️ Установить Ноду/Панель"
+        echo "5) 📊 Показать информацию о сервере"
+        echo "6) 📊 Проверить сервер в базах, доступность и пр"
         echo "0) Выход"
         read -p "Выберите действие: " option
 
@@ -267,7 +284,7 @@ show_menu() {
             5) show_info ;;
             6) check_scripts ;;
             0) echo "Выход..."; exit 0 ;;
-            *) echo -e "${RED}❌ Некорректный выбор${RESET}" ;;
+            *) echo -e "${RED}⚠️ Некорректный выбор${RESET}" ;;
         esac
     done
 }
