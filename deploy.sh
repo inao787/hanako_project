@@ -7,6 +7,7 @@ GREEN="\033[32m"
 YELLOW="\033[33m"
 BLUE="\033[34m"
 RESET="\033[0m"
+BOLD="\033[1;37m"
 
 # ---------------- ENV ----------------
 ENV_FILE=".env"
@@ -50,10 +51,28 @@ SERVER_IP=$(curl -s https://ipinfo.io/ip)
 
 # ---------------- OS Detection ----------------
 detect_os() {
-    OS=$(grep -E '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-    OS_VER=$(grep -E '^VERSION_ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-}
+    if [ -f /etc/os-release ]; then
+        # Получаем идентификатор ОС (ubuntu, debian, centos и т.д.)
+        OS=$(grep -E '^ID=' /etc/os-release | head -n1 | cut -d= -f2 | tr -d '"')
+        # Получаем версию ОС
+        OS_VER=$(grep -E '^VERSION_ID=' /etc/os-release | head -n1 | cut -d= -f2 | tr -d '"')
+    else
+        # Если /etc/os-release нет, используем lsb_release (для старых систем)
+        OS=$(lsb_release -si 2>/dev/null | tr '[:upper:]' '[:lower:]')
+        OS_VER=$(lsb_release -sr 2>/dev/null)
+    fi
 
+    # Определяем архитектуру
+    ARCH=$(uname -m)
+
+    # Дополнительно: преобразуем архитектуру в стандартные обозначения
+    case "$ARCH" in
+        x86_64) ARCH="amd64" ;;
+        i386|i686) ARCH="i386" ;;
+        aarch64|arm64) ARCH="arm64" ;;
+        *) ARCH="$ARCH" ;;  # оставляем как есть для нестандартных
+    esac
+}
 # ---------------- Dependency Check ----------------
 check_dependencies() {
     dependencies=(sudo curl docker ufw ssh-keygen openssl nload tmux neovim curl wget sudo sysbench)
@@ -79,6 +98,33 @@ check_dependencies() {
     else
         echo -e "${GREEN}✅ Все зависимости установлены ✅${RESET}"
     fi
+}
+
+SERVER_IP=$(curl -s https://ipinfo.io/ip)
+
+# ---------------- Get GEO ----------------
+
+get_geo_info() {
+    local ip="$1"
+
+    # Получаем данные по IP
+    local geo_json=$(curl -s https://ipinfo.io/$ip)
+    local city=$(echo "$geo_json" | jq -r '.city')
+    local region=$(echo "$geo_json" | jq -r '.region')
+    local country=$(echo "$geo_json" | jq -r '.country')
+
+    # Преобразуем код страны в эмодзи-флаг
+    local flag=""
+    if [ -n "$country" ]; then
+        for ((i=0; i<${#country}; i++)); do
+            char="${country:$i:1}"
+            code=$(( $(printf "%d" "'$char") + 127397 ))
+            flag+=$'\U'"$(printf "%08X" "$code")"
+        done
+    fi
+
+    local content="🌍 Локация сервера: $city, $region, $country $flag"
+    echo -e $content
 }
 
 # ---------------- Package Manager ----------------
@@ -222,17 +268,6 @@ install_node_panel() {
     echo -e "${GREEN}✅ Установка завершена. Проверьте .env и docker-compose.yml 🛠️${RESET}"
 }
 
-# ---------------- Info ----------------
-show_info() {
-    SERVER_IP=$(curl -s https://ipinfo.io/ip)
-    GEO=$(curl -s https://ipinfo.io/$SERVER_IP | grep -E '"city"| "region"| "country"' | tr -d '{},"' | tr '\n' ' ')
-    echo -e "${CYAN}🌐 Информация о системе:${RESET}"
-    echo -e "OS: $OS $OS_VER ($ARCH)"
-    echo -e "IP: $SERVER_IP"
-    echo -e "GEO: $GEO"
-    echo -e "Docker: $(docker --version 2>/dev/null || echo '⚠️ Не установлен')"
-    echo -e "Пользователь: $NEW_USER ($(id -nG $NEW_USER 2>/dev/null || echo '⚠️ не существует'))"
-}
 
 # ---------------- Check scripts ----------------
 check_scripts() {
@@ -266,14 +301,21 @@ check_scripts() {
 # ---------------- Menu ----------------
 show_menu() {
     while true; do
-        echo -e "\n${BLUE}=== Меню установки Remnawave ===${RESET}"
-        echo "1) 🛠️ Настроить пользователя и SSH"
-        echo "2) ⬆️ Установить Docker"
-        echo "3) ⬆️ Настроить Firewall"
-        echo "4) ⬆️ Установить Ноду/Панель"
-        echo "5) 📊 Показать информацию о сервере"
-        echo "6) 📊 Проверить сервер в базах, доступность и пр"
-        echo "0) Выход"
+        echo -e "${BOLD}⚡ Меню установки Remnawave ${RESET}"
+        echo -e "$(printf '─%.0s' $(seq 1 40))"
+        echo -e "${BOLD}Информация о системе:${RESET}"
+        echo -e "💻 OS: $OS $OS_VER ($ARCH)"
+        echo -e "🌐 IP: $SERVER_IP"
+        get_geo_info
+        echo -e "🐳 Docker: $(docker --version 2>/dev/null || echo '⚠️ Не установлен')"
+        echo -e "👤 Пользователь: $NEW_USER ($(id -nG $NEW_USER 2>/dev/null || echo '⚠️ не существует'))"
+        echo -e "$(printf '─%.0s' $(seq 1 40))"
+        echo "1. Настроить пользователя и SSH"
+        echo "2. Установить Docker"
+        echo "3. Настроить Firewall"
+        echo "4. Установить Ноду/Панель"
+        echo "5. Проверить сервер в базах, доступность и пр"
+        echo "0. Выход"
         read -p "Выберите действие: " option
 
         case $option in
@@ -281,8 +323,7 @@ show_menu() {
             2) install_docker ;;
             3) configure_firewall ;;
             4) install_node_panel ;;
-            5) show_info ;;
-            6) check_scripts ;;
+            5) check_scripts ;;
             0) echo "Выход..."; exit 0 ;;
             *) echo -e "${RED}⚠️ Некорректный выбор${RESET}" ;;
         esac
